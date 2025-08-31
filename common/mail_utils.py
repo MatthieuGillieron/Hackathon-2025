@@ -5,7 +5,7 @@ import re
 from typing import List, Optional
 
 from ik_apis import IKApi
-from ik_apis.mail import GetEmailResponse, async_get_mail
+from ik_apis.mail import GetEmailResponse, get_mail_metadata
 
 
 def clean_text(text):
@@ -39,7 +39,7 @@ async def get_mail(
 
     async def fetch_mail(msg_id: str, folder_id: str) -> Optional[GetEmailResponse]:
         try:
-            return await async_get_mail(ik_api, mailbox_uuid, folder_id, msg_id)
+            return await get_mail_metadata(ik_api, mailbox_uuid, folder_id, msg_id)
         except ValueError as e:
             logging.error(f"Failed to fetch email for msg_id {msg_id}: {e}")
             return None

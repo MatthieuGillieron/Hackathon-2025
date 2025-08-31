@@ -58,7 +58,6 @@ async function getApiToken() {
  */
 async function makeAuthenticatedRequest(url, options = {}) {
     const token = await getApiToken();
-
     const response = await fetch(url, {
         ...options, headers: {
             "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options.headers || {}),
@@ -72,14 +71,6 @@ async function makeAuthenticatedRequest(url, options = {}) {
     return response.json();
 }
 
-/**
- * Calls the event suggestion endpoint
- * @param {string} mailboxId
- * @param {string} folderId
- * @param {string} threadId
- * @param {string[]} context
- * @returns {Promise<any>}
- */
 function getEventSuggestion(mailboxId, folderId, threadId, context) {
     const url = `${CONFIG.API_BASE_URL}/mail/${mailboxId}/folder/${folderId}/thread/${threadId}/event_suggestion`;
     return makeAuthenticatedRequest(url, {
@@ -87,14 +78,27 @@ function getEventSuggestion(mailboxId, folderId, threadId, context) {
     });
 }
 
-/**
- * Orchestrates the event workflow API calls
- * @param {string} mailboxId
- * @param {string} folderId
- * @param {string} threadId
- * @param {string[]} context
- * @returns {Promise<any>}
- */
+function getEmailSummary(mailboxId, folderId, threadId, context) {
+    const url = `${CONFIG.API_BASE_URL}/mail/${mailboxId}/folder/${folderId}/thread/${threadId}/summary`;
+    return makeAuthenticatedRequest(url, {
+        method: "POST", body: JSON.stringify({context_message_uid: context}),
+    });
+}
+
+function getEmailReply(mailboxId, folderId, threadId, context) {
+    const url = `${CONFIG.API_BASE_URL}/mail/${mailboxId}/folder/${folderId}/thread/${threadId}/reply`;
+    return makeAuthenticatedRequest(url, {
+        method: "POST", body: JSON.stringify({context_message_uid: context}),
+    });
+}
+
+function getClassifierReply(mailboxId) {
+    const url = `${CONFIG.API_BASE_URL}/mail/${mailboxId}/classifier`;
+    return makeAuthenticatedRequest(url, {
+        method: "POST",
+    });
+}
+
 async function processEventWorkflow(mailboxId, folderId, threadId, context) {
     try {
         return await getEventSuggestion(mailboxId, folderId, threadId, context);
@@ -104,20 +108,65 @@ async function processEventWorkflow(mailboxId, folderId, threadId, context) {
     }
 }
 
+async function processSummaryWorkflow(mailboxId, folderId, threadId, context) {
+    try {
+        return await getEmailSummary(mailboxId, folderId, threadId, context);
+    } catch (error) {
+        console.error("Summary API Call Error:", error);
+        return {error: error.message};
+    }
+}
+
+async function processReplyWorkflow(mailboxId, folderId, threadId, context) {
+    try {
+        return await getEmailReply(mailboxId, folderId, threadId, context);
+    } catch (error) {
+        console.error("Reply API Call Error:", error);
+        return {error: error.message};
+    }
+}
+
+async function processClassifierWorkflow(mailboxId, folderId, threadId, context) {
+    try {
+        return await getClassifierReply(mailboxId, folderId, threadId, context);
+    } catch (error) {
+        console.error("Reply API Call Error:", error);
+        return {error: error.message};
+    }
+}
+
+
 // ---- Message handling from content scripts ----
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
-    if (request?.action !== "callApi") return false;
+    if (!request?.action || !["callApi", "callSummaryApi", "callReplyApi", "callClassifierApi"].includes(request.action)) return false;
 
     try {
         const payload = request.payload || {};
         const {mailboxId, folderId, threadId, context} = payload;
+
 
         if (!mailboxId || !folderId || !threadId || !Array.isArray(context)) {
             sendResponse({error: "Invalid payload"});
             return true;
         }
 
-        processEventWorkflow(mailboxId, folderId, threadId, context)
+        let workflow;
+        switch (request.action) {
+            case "callApi":
+                workflow = processEventWorkflow;
+                break;
+            case "callSummaryApi":
+                workflow = processSummaryWorkflow;
+                break;
+            case "callReplyApi":
+                workflow = processReplyWorkflow;
+                break;
+            case "callClassifierApi":
+                workflow = processClassifierWorkflow;
+                break;
+        }
+
+        workflow(mailboxId, folderId, threadId, context)
             .then(sendResponse)
             .catch((error) => {
                 console.error("Request error:", error);

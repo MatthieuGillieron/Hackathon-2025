@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
 import datetime
 import json
 import logging
@@ -146,6 +147,9 @@ class ListEmailsResponse(BaseModel):
 class MailFolder(BaseModel):
     id: str
     name: str
+    path: str
+    role: Optional[str] = None
+    children: Optional[list[MailFolder]] = None 
 
 
 class MailFolderResponse(BaseModel):

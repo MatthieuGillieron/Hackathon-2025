@@ -146,7 +146,108 @@ def remove_encrypted_data(content: str) -> str:
     return "".join(parts)
 
 
-async def get_email(
+# async def get_email(
+#         ik_api: IKApi,
+#         mailbox_id: str,
+#         folder_id: str,
+#         msg_id: str
+#         ) -> str:
+#     """
+#     Get email content in plain text format.
+
+#     Args:
+#         ik_api: Object for accessing API security headers
+#         mailbox_id: The ID of the mailbox to fetch the email from
+#         folder_id: The ID of the folder containing the email
+#         msg_id: The message ID of the email
+
+#     Returns:
+#         The email content in plain text format
+
+#     Raises:
+#         ValueError: If the API call fails or the email cannot be retrieved
+#     """
+#     url = f"https://mail.infomaniak.com/api/mail/{mailbox_id}/folder/{folder_id}/message/{msg_id}"
+#     headers = {
+#         **ik_api.security_headers, "Content-Type": "application/json",
+#         }
+#     params = {"prefered_format": "plain"}
+
+#     async with httpx.AsyncClient() as client:
+#         try:
+#             response = await client.get(url, headers=headers, params=params)
+#             response.raise_for_status()
+
+#             email_response = GetEmailResponse.model_validate_json(response.text)
+#             if not email_response.data.body:
+#                 raise ValueError(f"Email {msg_id} has no body content")
+
+#             return email_response.data.body.value
+
+#         except httpx.HTTPStatusError as e:
+#             logger.error(f"Failed to get email: {e.response.status_code} - {e.response.text}")
+#             raise ValueError(f"Failed to get email: {e.response.status_code}")
+#         except httpx.RequestError as e:
+#             logger.error(f"Request error: {e}")
+#             raise ValueError(f"Request failed: {e}")
+#         except ValidationError as e:
+#             logger.error(f"Email response validation failed: {e}")
+#             raise ValueError(f"Response validation failed: {e}")
+
+
+# async def async_get_mail(
+#         ik_api: IKApi,
+#         mailbox_id: str,
+#         folder_id: str,
+#         msg_id: str
+#         ) -> GetEmailResponse:
+#     """
+#     Asynchronously fetches an email's complete data using the Infomaniak API.
+
+#     Args:
+#         ik_api: Object for accessing API security headers
+#         mailbox_id: The ID of the mailbox to fetch the email from
+#         folder_id: The ID of the folder containing the email
+#         msg_id: The message ID of the email
+
+#     Returns:
+#         Complete email response with metadata and content
+
+#     Raises:
+#         ValueError: If the API call fails or the email cannot be retrieved
+#     """
+#     url = f"https://mail.infomaniak.com/api/mail/{mailbox_id}/folder/{folder_id}/message/{msg_id}"
+#     headers = {
+#         **ik_api.security_headers, "Content-Type": "application/json",
+#         }
+#     params = {"prefered_format": "plain"}
+
+#     async with httpx.AsyncClient() as client:
+#         try:
+#             response = await client.get(url, headers=headers, params=params)
+#             response.raise_for_status()
+
+#             email_data = response.json()
+#             if email_data["data"]["msg_id"] is None:
+#                 email_data["data"]["msg_id"] = msg_id
+
+#             mail = GetEmailResponse.model_validate(email_data)
+#             if mail.data.body:
+#                 mail.data.body.value = remove_encrypted_data(mail.data.body.value)
+
+#             return mail
+
+#         except httpx.HTTPStatusError as e:
+#             logger.error(f"Failed to get email: {e.response.status_code} - {e.response.text}")
+#             raise ValueError(f"Failed to get email: {e.response.status_code}")
+#         except httpx.RequestError as e:
+#             logger.error(f"Request error: {e}")
+#             raise ValueError(f"Request failed: {e}")
+#         except ValidationError as e:
+#             logger.error(f"Email response validation failed: {e}")
+#             raise ValueError(f"Response validation failed: {e}")
+
+async def get_mail_body(
         ik_api: IKApi,
         mailbox_id: str,
         folder_id: str,
@@ -195,7 +296,7 @@ async def get_email(
             raise ValueError(f"Response validation failed: {e}")
 
 
-async def async_get_mail(
+async def get_mail_metadata(
         ik_api: IKApi,
         mailbox_id: str,
         folder_id: str,
@@ -240,6 +341,34 @@ async def async_get_mail(
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to get email: {e.response.status_code} - {e.response.text}")
             raise ValueError(f"Failed to get email: {e.response.status_code}")
+        except httpx.RequestError as e:
+            logger.error(f"Request error: {e}")
+            raise ValueError(f"Request failed: {e}")
+        except ValidationError as e:
+            logger.error(f"Email response validation failed: {e}")
+            raise ValueError(f"Response validation failed: {e}")
+
+
+async def move_mails(
+        ik_api: IKApi,
+        mailbox_id: str,
+        dest_folder_id: str,
+        msg_uids: list[str]
+        ):
+    url = f"https://mail.infomaniak.com/api/mail/{mailbox_id}/message/move"
+    headers = {
+        **ik_api.security_headers, "Content-Type": "application/json",
+        }
+    params = {"prefered_format": "plain"}
+    data = {"uids":msg_uids,"to":dest_folder_id,"move_reactions":True}
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(url, headers=headers, params=params, json=data)
+            response.raise_for_status()
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to move emails: {e.response.status_code} - {e.response.text}")
+            raise ValueError(f"Failed to move emails: {e.response.status_code}")
         except httpx.RequestError as e:
             logger.error(f"Request error: {e}")
             raise ValueError(f"Request failed: {e}")
