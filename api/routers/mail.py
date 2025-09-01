@@ -79,7 +79,7 @@ validation_chain = VALIDATION_PROMPT | validation_prompt
 summary_client = client_from_config(model="qwen3", temperature=0.3, max_tokens=2000)
 summary_chain = SUMMARY_PROMPT | summary_client.with_structured_output(SummaryResponse)
 
-reply_client = client_from_config(model="qwen3", temperature=0.3, max_tokens=2500)
+reply_client = client_from_config(model="qwen3", temperature=0.3, max_tokens=1500)
 reply_chain = REPLY_PROMPT | reply_client.with_structured_output(ReplyResponse)
 
 
@@ -245,8 +245,8 @@ async def email_reply(
     text = clean_text(text)
     
     # Limit text length for faster processing (keep only last 1500 chars)
-    if len(text) > 1500:
-        text = text[-1500:]
+    if len(text) > 2500:
+        text = text[-2500:]
     
     try:
         result = reply_chain.invoke({"text": text})

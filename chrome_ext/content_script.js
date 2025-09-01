@@ -12,8 +12,9 @@
         .ai-btn {
           padding: 8px;
           border: 2px solid transparent;
-          background: #0098ff;
-          color: white;
+          background: white;
+		  border-color: gray;
+          color: gray;
           border-radius: 35px;
           cursor: pointer;
           font-weight: 500;
@@ -37,7 +38,7 @@
         .ai-btn:hover {
           transform: translateY(-2px);
           box-shadow: 0 4px 15px rgba(0, 152, 255, 0.4);
-          background: #0080d9;
+          background: #ffffffff;
           padding: 8px 16px;
         }
         .ai-btn:hover .btn-text {
@@ -83,7 +84,7 @@
         .filter-btn {
           padding: 8px;
           border: 2px solid transparent;
-          background: #F2357A;
+          background: #333333;
           color: white;
           border-radius: 35px;
           cursor: pointer;
@@ -113,11 +114,11 @@
         .filter-btn:hover {
           transform: translateY(-2px);
           box-shadow: 0 4px 15px rgba(242, 53, 122, 0.4);
-          background: #e02a6b;
+		  border-color: #D81B60;
         }
         .filter-btn.active {
-          background: #F2357A;
-          border-color: white;
+          background: #4B1C2E;
+          border-color: #D81B60;
           transform: translateY(-1px);
           box-shadow: 0 4px 15px rgba(242, 53, 122, 0.4);
         }
@@ -163,6 +164,43 @@
         targetSelector: "div.mailContent-open-footer.ng-star-inserted",
         messageItemSelector: "div.message-item"
     };
+
+    function createFullscreenSpinner() {
+        const overlay = document.createElement("div");
+        overlay.id = "classifier-overlay-spinner";
+        overlay.innerHTML = `
+      <style>
+        #classifier-overlay-spinner {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          background: rgba(0, 0, 0, 0.4);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 999999; /* very high so it's always on top */
+        }
+        #classifier-overlay-spinner .loader {
+          border: 8px solid #f3f3f3;
+          border-top: 8px solid #3498db;
+          border-radius: 50%;
+          width: 60px;
+          height: 60px;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      </style>
+      <div class="loader"></div>
+    `;
+        overlay.style.display = "none"; // hidden initially
+        document.body.appendChild(overlay);
+        return overlay;
+    }
 
     const parseDateTime = (dateStr, timeStr) => {
         try {
@@ -444,18 +482,15 @@
 
 
     const callClassifierApi = async (content) => {
-        const { formattedEmails, folderThreads } = extractEmailThreadInfo(content);
-        if (folderThreads.length === 0) return;
-
         const { mailboxIds = [] } = await storageGet({ mailboxIds: [] });
         if (mailboxIds.length === 0) return;
 
         const mailboxId = mailboxIds[0];
-        const lastThread = folderThreads[folderThreads.length - 1];
 
+        console.log('sending to background')
         const response = await runtimeSendMessage({
             action: "callClassifierApi", payload: {
-                mailboxId, folderId: lastThread.folderId, threadId: lastThread.threadId, context: formattedEmails,
+                mailboxId, folderId: null, threadId: null, context: null,
             },
         });
 
@@ -502,25 +537,49 @@
 
         const btn = targetDiv.querySelector(`#${CONFIG.buttonId}`);
         if (btn) {
-            btn.addEventListener("click", () => {
+            const overlaySpinner = createFullscreenSpinner()
+            btn.addEventListener("click", async () => {
                 const content = getMessageItemContent();
-                callApi(content).catch((err) => console.error("Failed to call API:", err));
+                overlaySpinner.style.display = "flex";
+                try {
+                    await callApi(content);
+                } catch (err) {
+                    console.error("Failed to call API:", err);
+                } finally {
+                    overlaySpinner.style.display = "none";
+                }
             });
         }
 
         const summaryBtn = targetDiv.querySelector('#summary_api_call');
         if (summaryBtn) {
-            summaryBtn.addEventListener("click", () => {
+            const overlaySpinner = createFullscreenSpinner()
+            summaryBtn.addEventListener("click", async () => {
                 const content = getMessageItemContent();
-                callSummaryApi(content).catch((err) => console.error("Failed to call Summary API:", err));
+                overlaySpinner.style.display = "flex";
+                try {
+                    await callSummaryApi(content);
+                } catch (err) {
+                    console.error("Failed to call API:", err);
+                } finally {
+                    overlaySpinner.style.display = "none";
+                }
             });
         }
 
         const replyBtn = targetDiv.querySelector('#reply_api_call');
         if (replyBtn) {
-            replyBtn.addEventListener("click", () => {
+            const overlaySpinner = createFullscreenSpinner()
+            replyBtn.addEventListener("click", async () => {
                 const content = getMessageItemContent();
-                callReplyApi(content).catch((err) => console.error("Failed to call Reply API:", err));
+                overlaySpinner.style.display = "flex";
+                try {
+                    await callReplyApi(content);
+                } catch (err) {
+                    console.error("Failed to call API:", err);
+                } finally {
+                    overlaySpinner.style.display = "none";
+                }
             });
         }
     };
@@ -543,10 +602,17 @@
             menuTitleDiv.insertAdjacentElement('afterend', classifyDiv);
             const classifyBtn = classifyDiv.querySelector('#classify_api_call');
             if (classifyBtn) {
-                classifyBtn.addEventListener('click', () => {
-                    console.log('click')
+                const overlaySpinner = createFullscreenSpinner()
+                classifyBtn.addEventListener('click', async () => {
                     const content = getMessageItemContent();
-                    callClassifierApi(content).catch((err) => console.error("Failed to call API:", err));
+                    overlaySpinner.style.display = "flex";
+                    try {
+                        await callClassifierApi(content);
+                    } catch (err) {
+                        console.error("Failed to call API:", err);
+                    } finally {
+                        overlaySpinner.style.display = "none";
+                    }
                 });
             }
         }

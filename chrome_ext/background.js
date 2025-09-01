@@ -1,6 +1,6 @@
 // Background service worker for the extension
 
-import {storageGet, storageSet} from "./shared/chrome.js";
+import { storageGet, storageSet } from "./shared/chrome.js";
 
 // ---- Configuration ----
 const CONFIG = {
@@ -25,10 +25,10 @@ async function captureMailboxId(details) {
 
     const mailboxId = match[1];
     try {
-        const {mailboxIds = []} = await storageGet({mailboxIds: []});
+        const { mailboxIds = [] } = await storageGet({ mailboxIds: [] });
         const unique = new Set(mailboxIds);
         unique.add(mailboxId);
-        await storageSet({mailboxIds: [...unique]});
+        await storageSet({ mailboxIds: [...unique] });
     } catch (error) {
         console.error("Failed to store mailbox ID:", error);
     }
@@ -45,7 +45,7 @@ chrome.webRequest.onCompleted.addListener(captureMailboxId, {
  * @returns {Promise<string>}
  */
 async function getApiToken() {
-    const {apiToken} = await storageGet("apiToken");
+    const { apiToken } = await storageGet("apiToken");
     if (!apiToken) throw new Error("API Token is not set.");
     return apiToken;
 }
@@ -74,26 +74,27 @@ async function makeAuthenticatedRequest(url, options = {}) {
 function getEventSuggestion(mailboxId, folderId, threadId, context) {
     const url = `${CONFIG.API_BASE_URL}/mail/${mailboxId}/folder/${folderId}/thread/${threadId}/event_suggestion`;
     return makeAuthenticatedRequest(url, {
-        method: "POST", body: JSON.stringify({context_message_uid: context}),
+        method: "POST", body: JSON.stringify({ context_message_uid: context }),
     });
 }
 
 function getEmailSummary(mailboxId, folderId, threadId, context) {
     const url = `${CONFIG.API_BASE_URL}/mail/${mailboxId}/folder/${folderId}/thread/${threadId}/summary`;
     return makeAuthenticatedRequest(url, {
-        method: "POST", body: JSON.stringify({context_message_uid: context}),
+        method: "POST", body: JSON.stringify({ context_message_uid: context }),
     });
 }
 
 function getEmailReply(mailboxId, folderId, threadId, context) {
     const url = `${CONFIG.API_BASE_URL}/mail/${mailboxId}/folder/${folderId}/thread/${threadId}/reply`;
     return makeAuthenticatedRequest(url, {
-        method: "POST", body: JSON.stringify({context_message_uid: context}),
+        method: "POST", body: JSON.stringify({ context_message_uid: context }),
     });
 }
 
 function getClassifierReply(mailboxId) {
     const url = `${CONFIG.API_BASE_URL}/mail/${mailboxId}/classifier`;
+    console.log(url)
     return makeAuthenticatedRequest(url, {
         method: "POST",
     });
@@ -104,7 +105,7 @@ async function processEventWorkflow(mailboxId, folderId, threadId, context) {
         return await getEventSuggestion(mailboxId, folderId, threadId, context);
     } catch (error) {
         console.error("API Call Error:", error);
-        return {error: error.message};
+        return { error: error.message };
     }
 }
 
@@ -113,7 +114,7 @@ async function processSummaryWorkflow(mailboxId, folderId, threadId, context) {
         return await getEmailSummary(mailboxId, folderId, threadId, context);
     } catch (error) {
         console.error("Summary API Call Error:", error);
-        return {error: error.message};
+        return { error: error.message };
     }
 }
 
@@ -122,16 +123,16 @@ async function processReplyWorkflow(mailboxId, folderId, threadId, context) {
         return await getEmailReply(mailboxId, folderId, threadId, context);
     } catch (error) {
         console.error("Reply API Call Error:", error);
-        return {error: error.message};
+        return { error: error.message };
     }
 }
 
 async function processClassifierWorkflow(mailboxId, folderId, threadId, context) {
     try {
-        return await getClassifierReply(mailboxId, folderId, threadId, context);
+        return await getClassifierReply(mailboxId);
     } catch (error) {
         console.error("Reply API Call Error:", error);
-        return {error: error.message};
+        return { error: error.message };
     }
 }
 
@@ -142,11 +143,11 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 
     try {
         const payload = request.payload || {};
-        const {mailboxId, folderId, threadId, context} = payload;
+        const { mailboxId, folderId, threadId, context } = payload;
 
 
-        if (!mailboxId || !folderId || !threadId || !Array.isArray(context)) {
-            sendResponse({error: "Invalid payload"});
+        if (request.action !== 'callClassifierApi' && (!mailboxId || !folderId || !threadId || !Array.isArray(context))) {
+            sendResponse({ error: "Invalid payload" });
             return true;
         }
 
@@ -165,18 +166,18 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
                 workflow = processClassifierWorkflow;
                 break;
         }
-
+        console.log(workflow)
         workflow(mailboxId, folderId, threadId, context)
             .then(sendResponse)
             .catch((error) => {
                 console.error("Request error:", error);
-                sendResponse({error: error.message});
+                sendResponse({ error: error.message });
             });
 
         return true; // async response
     } catch (e) {
         console.error("Unexpected error:", e);
-        sendResponse({error: String(e)});
+        sendResponse({ error: String(e) });
         return true;
     }
 });
